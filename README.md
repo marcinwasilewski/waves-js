@@ -1,6 +1,8 @@
 # waves-js
 Colorful waves effect in canvas
+
 This is the animation I created for my portfolio at https://marcinwasilewski.net
+
 Being very keen on music, I wanted to make something eye-candy that would resemble sound waves.
 
 Here's a rough idea of how it works:
