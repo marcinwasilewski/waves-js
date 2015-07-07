@@ -1,365 +1,430 @@
-(function() {
+/*
+            __   __                       __          ___       __                      ___ ___ 
+ |\/|  /\  |__) /  ` | |\ |    |  |  /\  /__` | |    |__  |  | /__` |__/ |        |\ | |__   |  
+ |  | /~~\ |  \ \__, | | \|    |/\| /~~\ .__/ | |___ |___ |/\| .__/ |  \ |    .   | \| |___  |  
+*/
 
-	var animate, w, h, pi, color, secondaryColor, redraw, move, mx, my, my2, lineWidth, waves;
+// requestAnimationFrame polyfill
 
-	animate=true;
-	w = window.innerWidth;
-	h = window.innerHeight;
-	pi = 0.5*Math.PI;
-	color = '255,255,255';
-	secondaryColor = '0,0%,0%';
-	redraw=true;
-	move = true;
-	mx=0,my=0,my2=0;
-	lineWidth = 2;
-	mouse_moved = 0;
-	waves = [
-		{
-			x : 0,
-			amplitude : 0,
-			range : 5,
-			wavelength : 45,
-			phase : 20,
-			space : -1, 
-			count : 0,
-			maxamp : 70,
-		},
-		{
-			x : 2,
-			amplitude : 0,
-			range :25,
-			wavelength : 5,
-			phase : 45,
-			space : -1.4, 
-			count : 0,
-			maxamp : 5,
-		},
-		{
-			x : 10,
-			amplitude : 0,
-			range : 10,
-			wavelength : 85,
-			phase : 86,
-			space : 1, 
-			count : 0,
-			maxamp : 90,
-		},
-			 
-		
-		
+var lastTime = 0;
+var vendors = ['webkit', 'moz'];
+for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+    window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+    window.cancelAnimationFrame =
+      window[vendors[x]+'CancelAnimationFrame'] || window[vendors[x]+'CancelRequestAnimationFrame'];
+}
 
-		{
-			x : 20,
-			amplitude : 0,
-			range :10,
-			wavelength : 20,
-			phase : 100,
-			space : 1, 
-			count : 0,
-			maxamp : 85,
-		},
-		{
-			x : 30,
-			amplitude : 0,
-			range :5,
-			wavelength : 40,
-			phase : 35,
-			space : 2, 
-			count : 0,
-			maxamp : 90,
-		},
-		{
-			x : 39,
-			amplitude : 0,
-			range : 5,
-			wavelength : 15,
-			phase : 95,
-			space : 1, 
-			count : 0,
-			maxamp : 24,
-		},
-		{ 
-			x : 40,
-			range : 12,
-			amplitude : 0,
-			wavelength : 100,
-			phase : 140,
-			space : -3,
-			count : 0,
-			maxamp:120,
-			minamp:4,
-		 },
-		 { 
-			x : 53,
-			range : 9,
-			amplitude : 0,
-			wavelength : 90,
-			phase : 70,
-			space : 0.4,
-			count : 0,
-			maxamp:120,
-		},
-		{ 
-			x : 59,
-			range : 7,
-			amplitude : 0,
-			wavelength : 2,
-			phase : 3,
-			space : 2,
-			count : 0,
-			maxamp:20,
-		},
+if (!window.requestAnimationFrame)
+    window.requestAnimationFrame = function(callback, element) {
+        var currTime = new Date().getTime();
+        var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+        var id = window.setTimeout(function() { callback(currTime + timeToCall); },
+          timeToCall);
+        lastTime = currTime + timeToCall;
+        return id;
+    };
 
-		{ 
-			x : 60,
-			range : 7,
-			amplitude : 0,
-			wavelength : 12,
-			phase : 0,
-			space : -3,
-			count : 0,
-			maxamp:59,
-		},
-		{ 
-			x :70,
-			range : 20,
-			amplitude : 0,
-			wavelength : 300,
-			phase : 30,
-			space :20,
-			count : 0,
-			maxamp:30,
-		},	 	
-		{
-			x : 74,
-			amplitude : 0,
-			range : 15,
-			wavelength : 26,
-			phase : 95,
-			space : -1, 
-			count : 0,
-			maxamp : 61,
-		},
-		{
-			x : 90,
-			range : 5,
-			amplitude : 0,
-			wavelength : 10,
-			phase : 0,
-			space : 1,
-			momuseSpace : 2,
-			count : 0,
-			maxamp:20,
-		 },
-		{
-			x : 92,
-			amplitude : 0,
-			range : 5,
-			wavelength : 25,
-			phase : 95,
-			space : -1, 
-			count : 0,
-			maxamp : 61,
-		},
-		 
-	];
+if (!window.cancelAnimationFrame)
+    window.cancelAnimationFrame = function(id) {
+        clearTimeout(id);
+    };
 
-	$(function() {
+function Waves(canvas, options) {
 
-		// create canvas
-		
-		canvas = document.getElementById('canvas'),
-		context = canvas.getContext('2d');
-		
-		// resize the canvas to fill browser window dynamically
-		
-		window.addEventListener('resize', resizeCanvas, false);
+	this.waves = [];
+	this.animate=true;
+	this.w = window.innerWidth;
+	this.h = window.innerHeight;
+	this.pi = 0.5*Math.PI;
+	this.color = '255,255,255';
+	this.secondaryColor = '120,50%,50%';
+	this.thirdColor = '50,50%,50%';
+	this.hue = 0;
+	this.redraw=true;
+	this.move = true;
+	this.mx=(this.w/105)*Math.floor(Math.random()*100+5);
+	this.mx_offset = 0;
+	this.my=1;
+	this.my2=0;
+	this.lineWidth = 2;
+	this.mouseMoved = 0;
+	this.waitTime = 500; // time before auto X-axis movement sets in
+	this.canvas = document.getElementById(canvas);
+	this.setCanvas = function(canvas){if(canvas!=this.canvas) { this.canvas = canvas;this.resizeCanvas(); }};
+	this.timeout = null;
+	this.mouseMoved = 0;
+	this.globalSpeed = 0.2;
+	this.advanceInterval = 1000/50;
+	this.debug = false;
+	this.offsetY = 0;
+	this.mode = 1;
+	this.mouse = true;
 
-		function resizeCanvas() {
-				w = window.innerWidth;
-				h = window.innerHeight;
-				canvas.width = w;
-				canvas.height = h;
-				redraw=true;
-		}
-		
-		resizeCanvas();
-		
-		drawStuff();
-		
-		updateColor();
-		
-		// drawing function
+	if(typeof(options.debug)!="undefined") this.debug = options.debug;
+	this.colorClassName = "";
+	if(typeof(options.colorClassName)!="undefined") this.colorClassName = options.colorClassName;
+	this.bgColorClassName = "";
+	if(typeof(options.bgColorClassName)!="undefined") this.bgColorClassName = options.bgColorClassName;
+	this.lighterColorClassName = "";
+	if(typeof(options.lighterColorClassName)!="undefined") this.lighterColorClassName = options.lighterColorClassName;
+	this.shadowClassName = "";
+	if(typeof(options.shadowClassName)!="undefined") this.shadowClassName = options.shadowClassName;
+
+
+	function Wave(options) {
+
+		if(typeof(options) == "undefined") options = {};
+
+		// optionable variables
+		this.x = 0;
+		if(typeof(options.x) != "undefined") this.x = options.x;
+
+		this.amplitude = 0;
+		if(typeof(options.amplitude) != "undefined") this.amplitude = options.amplitude;
+
+		this.range = 1;
+		if(typeof(options.range) != "undefined") this.range = options.range;
+
+		this.wavelength = 1;
+		if(typeof(options.wavelength) != "undefined") this.wavelength = options.wavelength;
+
+		this.phase = 0;
+		if(typeof(options.phase) != "undefined") this.phase = options.phase;
+
+		this.space = 1;
+		if(typeof(options.space) != "undefined") this.space = options.space;
+
+		this.maxamp = 0;
+		if(typeof(options.maxamp) != "undefined") this.maxamp = options.maxamp;
+
+		// non-options variables 
+		this.count = 0;
+
+		this.update = function(object) {
+			var mx = object.mx+object.mx_offset;
+			if(mx>object.w) mx = mx-object.w;
+
+			var mp = mx/object.w;
+			var dist =  Math.abs(mp*100-this.x);
 			
-		function drawStuff() {
-			if(redraw && animate) {
-			
-				// clear canvas
-					
-				canvas.width=canvas.width;
+			if(dist<this.range) {
 
-				/* waves on the sides */
-				
-				grd=context.createRadialGradient(w/2,h/2,250,w/2,h/2,w/2);
-				grd.addColorStop(0,'rgba('+color+',0)');
-				grd.addColorStop(1,'rgba('+color+',0.4)');
-				context.strokeStyle=grd;
-				for (j = 0; j < waves.length; ++j) {
-					context.beginPath();
-					
-					if(waves[j].amplitude>0) {
-						for(i=0;i<w;i++) {
+				this.amplitude = this.maxamp - dist/this.range*this.maxamp;
 
-							inc = (pi * (w/waves[j].wavelength)) / (w);
-							rads = (waves[j].count - i) * inc + waves[j].phase;
-							_newamp =  waves[j].amplitude  * (1-Math.abs((i/w)-.5)*2);
-							context.lineTo(i, (h/2)+Math.sin(rads)*_newamp);				
-							}
-					}
-					context.stroke();		
-				}	
-			
-				// superposition of the waves in the center
-				
-				context.lineWidth=lineWidth;				
-				context.moveTo(w/2-240, (h/2));			
-				context.beginPath();	
-				for(i=w/2-360;i<w/2+340;i++) {	
-					finaltdy=0;
-					for (j = 0; j < waves.length; ++j) {
-						inc = (pi * (w/waves[j].wavelength)) / (w);
-						rads = (waves[j].count - i) * inc + waves[j].phase;
-						tdy = Math.sin(rads)*waves[j].amplitude;
-						finaltdy+=tdy;	
-							
-					}
-					
-					// mouse attraction? for the future 
-					
-					attract = 25;
-					
-					mdx = i - mx;
-					mdy = (h/2)+finaltdy - my;
-						
-					distance = Math.sqrt(Math.pow(mdx, 2)+Math.pow(mdy, 2));
-					addtdx= -(mdx * attract) / distance;
-					addtdy= -(mdy * attract) / distance;
-					
-					context.lineTo(i, (h/2)+finaltdy);
-				}
-				
-				grd=context.createRadialGradient(w/2,h/2,0,w/2,h/2,260);
-				grd.addColorStop(0,'hsla('+secondaryColor+',1)');
-				grd.addColorStop(1,'hsla('+secondaryColor+',0)');
-				context.strokeStyle=grd;
-			
-				if(finaltdy!=0) context.stroke();		
 			}
-			
-			// finished redrawing this frame
-			
-			redraw = false;
-			
-			requestAnimationFrame(drawStuff);
-		}
+			else this.amplitude = 0; 
+		};
+
+	}
+
+	this.addWave = function(options) {
+		this.waves.push(new Wave(options));
+	};
+
+	this.addWaves = function(arr) {
+		for (var i = arr.length - 1; i >= 0; i--) {
+			this.addWave(arr[i]);
+		};
+	};
+
+	this.updateWaves = function() {		
+		for (var i = this.waves.length - 1; i >= 0; i--) {
+			this.waves[i].update(this);
+		};
+	};
+
+
+
+	this.updateColors = function() {
+		var width = this.w/50;
+		var height = this.h/50;
+		var pageX = parseInt(this.mx / width,10);
+
+		this.hue = ((this.my / height) + (this.mx / width))*3.6;
+		this.hue=Math.round(this.hue+this.my2);
+		if(this.hue>360) this.hue-=360;
 		
-		function getMousePos(e) {
-			return {
-			  x: parseInt(e.clientX),
-			  y: parseInt(e.clientY)
+		this.secondaryColor = this.hue+","+50+"%,50%";
+		this.thirdColor = this.hue+","+15+"%,50%";		
+
+		if(this.colorClassName!="") {
+
+			var arr = document.getElementsByClassName(this.colorClassName);
+			for (var i = arr.length - 1; i >= 0; i--) {
+				
+				arr[i].style.color="hsla("+this.secondaryColor+",1)";
+				
 			};
-		}
-		
-		// calculate changes in amplitudes of waves with regard to mouse pos
-				
-		function recalculateWaves() {			
-			for (j = 0; j < waves.length; ++j) {
-				
-				// calculate distance from maximum amplitude point for that wave
-				
-				mp = mx/w;
-				
-				dist =  Math.abs(mp*100-waves[j].x);
-				
-				// if we are within this wave's range, let the "attenuation" be a function of distance and maximum range
-				
-				if(dist<waves[j].range) {
-					waves[j].amplitude = waves[j].maxamp - dist/waves[j].range*waves[j].maxamp;
-				}
-				else waves[j].amplitude = 0; 
-			}
-		}
-		
-		// advance waves every X ms
-		
-		setInterval(
-			function() {
-			recalculateWaves();
-				if(move) 
-					advance();
-			},80); 
 
-		// advance waves forward/backward
-		
-		function advance() {
-			for (j = 0; j < waves.length; ++j) {
-				waves[j].count+= waves[j].space;
-			}	
-			recalculateWaves();
-			redraw=true;
-		}
-		
-		function backwards(mult) {
-			for (j = 0; j < waves.length; ++j) {
-				waves[j].count+= mult*waves[j].space;
+			var arr = document.getElementsByClassName(this.bgColorClassName);
+			for (var i = arr.length - 1; i >= 0; i--) {
 				
-			}	
-			recalculateWaves();
-			redraw=true;
+				arr[i].style.backgroundColor="hsl("+this.hue+",10%,60%)";
+				console.log(this.bgColorClassName);
+				
+			};
+
+			var arr = document.getElementsByClassName(this.shadowClassName);
+			for (var i = arr.length - 1; i >= 0; i--) {
+				
+				arr[i].style.textShadow="0px 0px 4px hsla("+this.thirdColor+",1)";
+				
+			};
+
+			var arr = document.getElementsByClassName(this.lighterColorClassName);
+			for (var i = arr.length - 1; i >= 0; i--) {
+				
+				arr[i].style.color="hsla("+this.thirdColor+",1)";
+				
+			};
+			
 		}
+	};
+
+	this.colorTime = function() {
+		this.my2++;
+		if(this.my2>360) this.my2=0;
+
+		// this functions needs to run periodically
+
+		window.setTimeout(this.colorTime.bind(this),100);
 		
-		// colors change on their own or depending on mouse position
+		// if mouse wasn't moved in the last 2 seconds,
+		// "animate" moving it along X axis so that waves change
+		// @TODO more fluency 
+
+		if(this.mouseMoved==0) {
+			this.mx_offset+=this.w/1000*0.55;
+			if(this.mx_offset>=this.w) this.mx_offset=this.mx_offset-this.w;
+			this.updateWaves();
+		}
+
+					
+		this.updateColors();
 		
-		function updateColor() {
-			if(mouse_moved==0) {
-				my2++;
-				if(my2>360) my=0;
-				secondaryColor = my2+",50%,50%";
-				$('#skills strong').css('color','hsl('+my2+","+15+"%,50%"+')');
-				$('.myname').css('color','hsl('+my2+","+10+"%,50%"+')');
-				$('h2 .myname').css('text-shadow','0 0 2px hsl('+my2+","+40+"%,50%"+')');
-				window.setTimeout(updateColor,150);
+	};
+
+	this.onMouseMove = function(e) {
+		if(!this.isVisible()) return false;
+		if(!this.mouse) return false;
+
+		this.mx = e.clientX;
+		this.my = e.clientY;
+		if(this.isVisible()) {
+			this.updateWaves();
+
+		}
+		this.updateColors();
+		this.redraw = true;
+		this.mouseMoved=1;
+		clearTimeout(this.timeout);
+		if(this.waitTime>0) this.timeout = setTimeout(function(){this.mouseMoved=0}.bind(this), this.waitTime);
+	};
+
+
+	this.drawWaves = function() {
+		var ctx = this.canvas.getContext('2d');
+		var grd=ctx.createRadialGradient(this.w/2,this.h/2+this.offsetY,280,this.w/2,this.h/2+this.offsetY,this.w/2);
+		grd.addColorStop(0,'hsla('+this.thirdColor+',0)');
+		grd.addColorStop(1,'hsla('+this.thirdColor+',1)');
+		ctx.strokeStyle=grd;
+		//ctx.strokeStyle="white";
+		ctx.lineWidth = this.lineWidth;	
+		for (var j = this.waves.length - 1; j >= 0; j--) {
+			ctx.beginPath();
+			if(this.waves[j].amplitude>0) {
+
+				for(var i=0;i<this.w;i++) {
+					if(i>this.w/2-260 && i<this.w/2+260) {
+						//ctx.stroke();ctx.beginPath();
+						continue;
+					}
+					var inc = (this.pi * (this.w/this.waves[j].wavelength)) / (this.w);
+					var rads = (this.waves[j].count - i) * inc + this.waves[j].phase;
+					var _newamp =  this.waves[j].amplitude  * (1-Math.abs((i/this.w)-.5)*2);
+					ctx.lineTo(i, 0.5+(this.h/2)+Math.sin(rads)*_newamp+this.offsetY);				
+					}
+			}
+			ctx.stroke();		
+		}			
+	};
+
+	this.drawBg = function(color) {
+		var context = this.canvas.getContext('2d');
+
+			
+			
+			if(color=="white") {
+				
+				
+				grd=context.createRadialGradient(this.w/2,this.h/2+this.offsetY,100,this.w/2,this.h/2+this.offsetY,this.h/2);	
+				grd.addColorStop(0,'hsla('+this.thirdColor+',0.3)');
+				grd.addColorStop(0.5,'hsla('+this.thirdColor+',0)');
+				context.strokeStyle=grd;
 			}
 			else {
-				var $width = w/100;
-				var $height = h/100;
-				var $pageX = parseInt(mx / $width,10);
-				var $pageY = parseInt((my / $height) - (mx / $width),36);	
-				secondaryColor = $pageY+","+$pageX+"%,50%";
-				$('#skills strong').css('color','hsl('+$pageY+","+15+"%,50%"+')');
-				$('.myname').css('color','hsl('+$pageY+","+10+"%,50%"+')');
-				$('h2 .myname').css('text-shadow','0 0 2px hsl('+$pageY+","+40+"%,50%"+')');
+				//grd.addColorStop(1,'rgba(255,255,255,0.1)');
+				grd=context.createRadialGradient(this.w/2,this.h/2+this.offsetY,370,this.w/2,this.h/2+this.offsetY,this.w/2);	
+				grd.addColorStop(0,'hsla('+this.thirdColor+',0)');
+				grd.addColorStop(0.5,'hsla('+this.thirdColor+',1)');
+				context.strokeStyle=grd;
+			}
+
+		
+		context.lineWidth = 1	;
+		context.beginPath();	
+
+		for(i=0;i<this.w;i++) {	
+			var finaltdy=0;
+
+			/*if(i>this.w/2-100 && i<this.w/2+100) {
+				context.stroke();context.beginPath();
+				continue;
+			}*/
+
+			for (var j = this.waves.length - 1; j >= 0; j--) {
+
+				var rads = (i) * (this.waves[j].wavelength);
+				var tdy = Math.sin(rads)*this.waves[j].amplitude* (1-Math.abs((i/this.w)-.5)*2)*3;
+				finaltdy+=tdy;	
+					
+			}
+						
+			context.lineTo(i, (this.h/2)+finaltdy+this.offsetY);
+		}
+	
+		context.stroke();
+	};
+
+	this.drawAmplitudeModulation = function() {
+		// superposition of the waves in the center
+		var context = this.canvas.getContext('2d');
+		//context.lineWidth=lineWidth;			
+		
+		grd=context.createRadialGradient(this.w/2,this.h/2,0,this.w/2,this.h/2,260);
+		grd.addColorStop(0,'hsla('+this.secondaryColor+',1)');
+		grd.addColorStop(1,'hsla('+this.secondaryColor+',0)');
+		context.strokeStyle=grd;
+		context.lineWidth = this.lineWidth;
+		context.moveTo(this.w/2-240, (this.h/2));			
+		context.beginPath();	
+		for(var i=0;i<this.w;i++) {
+			var finaltdy=0;
+
+			for (var j = this.waves.length - 1; j >= 0; j--) {
+
+				var inc = (this.pi * (this.w/this.waves[j].wavelength)) / (this.w);
+				var rads = (this.waves[j].count - i) * inc + this.waves[j].phase;
+				var tdy = Math.sin(rads)*this.waves[j].amplitude;
+				finaltdy+=tdy;	
+					
 			}
 			
+			context.lineTo(i, (this.h/2)+finaltdy+this.offsetY);
 		}
-		
-		$(document).scroll(function(){
-			advance();
-			redraw=true;
-		});
-		
-		$(document).mousemove(function(e) {
-			mouse_moved=1;
-			p = getMousePos(e);
-			mx = p.x;
-			my = p.y;	
-			redraw=true;
-			updateColor(p);
-			backwards(0.5);
-		});
-		
-		
-		
-	});
+	
+		if(finaltdy!=0) context.stroke();
+	};
 
-}());
+	this.isVisible = function() {
+		//return true;
+		var bodyRect = document.body.getBoundingClientRect();
+		var elemRect = this.canvas.getBoundingClientRect();
+		var  offset   = elemRect.top - bodyRect.top;
+		var top  = window.pageYOffset || document.documentElement.scrollTop;
+		if((top>=offset && top<=offset+this.canvas.height) || (top+this.h>=offset && top+this.h<=offset+this.canvas.height)) return true;
+		return false;
+	};
+
+	this.draw = function() {
+		if(this.redraw && this.animate && this.isVisible()) {
+			this.canvas.width = this.canvas.width; // clear canvas
+			var ctx = this.canvas.getContext('2d');
+			if(this.mode==1) {
+				this.drawBg("white");
+				this.drawAmplitudeModulation();		
+				//this.drawBg();
+			}
+			else if(this.mode==2 && this.w>800) {
+				this.drawWaves();
+				this.drawBg();
+
+			}
+			else if(this.mode==3) {
+				this.drawBg("white");
+				this.drawWaves();
+				this.drawAmplitudeModulation();		
+			}
+			this.redraw=false;
+		}
+		requestAnimationFrame(this.draw.bind(this));
+	}
+
+	if(typeof(options.waves) != "undefined") {
+		this.addWaves(options.waves);		
+	}
+
+	this.resizeCanvas = function() {
+		this.w = window.innerWidth;
+		this.h = window.innerHeight;
+		this.canvas.width = this.w;
+		this.canvas.height = this.h;
+
+		if(this.w<500) this.offsetY=-Math.floor(this.h*0.1)+0.5;
+		else this.offsetY = 0;
+
+		this.redraw=true;
+	}
+
+	this.advance = function(multiplier) {
+		if(!this.isVisible()) return false;
+		for (var i = this.waves.length - 1; i >= 0; i--) {
+			var add = this.waves[i].space*this.globalSpeed;
+			if(typeof(multiplier)!="undefined")
+				add = add*multiplier;
+			this.waves[i].count+= add;
+
+		}	
+		this.redraw=true;
+	};
+
+	this.updateDebug = function() {
+
+		if(this.debug) {
+			var debug = document.getElementsByClassName("debug");
+			
+			if(debug.length) debug[0].parentNode.removeChild(debug[0]);
+
+			debug = document.createElement("div");
+			debug.className="debug";
+			document.body.appendChild(debug);
+
+			var colorDiv = document.createElement("div");
+			colorDiv.innerText = "thirdColor: "+this.thirdColor;
+			debug.appendChild(colorDiv);
+
+			var mouseDiv = document.createElement("div");
+			mouseDiv.innerText = "Mx: "+this.mx.toPrecision(4)+", my: "+this.my.toPrecision(4);
+			debug.appendChild(mouseDiv);
+
+			for (var i = this.waves.length - 1; i >= 0; i--) {
+				var waveDiv = document.createElement("div");
+				var tmp = this.waves[i];
+				waveDiv.innerText = tmp.x+": - "+tmp.amplitude.toPrecision(3)+" +";
+				debug.appendChild(waveDiv);
+			};
+
+		};	
+	};
+
+	// bind stuff
+	window.onmousemove = this.onMouseMove.bind(this);
+	window.addEventListener('resize', this.resizeCanvas.bind(this), false);
+	window.setInterval(this.advance.bind(this), this.advanceInterval);
+	if(this.debug) window.setInterval(this.updateDebug.bind(this), 30);
+
+	this.resizeCanvas();
+	this.draw();
+	this.colorTime();
+	this.updateDebug();
+}
